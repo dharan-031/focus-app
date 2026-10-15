@@ -11,6 +11,9 @@ import {
   Coffee,
   Brain,
   Sliders,
+  Lock,
+  Unlock,
+  ShieldCheck,
 } from 'lucide-react';
 import { TimerMode, Task, formatTime, calculateProgressOffset } from '../utils/logic';
 
@@ -30,6 +33,8 @@ interface TimerCardProps {
   onToggleSound: () => void;
   onOpenZen: () => void;
   onAdjustTime: (deltaSeconds: number) => void;
+  strictLockEnabled: boolean;
+  onToggleStrictLock: () => void;
 }
 
 export const TimerCard: React.FC<TimerCardProps> = ({
@@ -48,6 +53,8 @@ export const TimerCard: React.FC<TimerCardProps> = ({
   onToggleSound,
   onOpenZen,
   onAdjustTime,
+  strictLockEnabled,
+  onToggleStrictLock,
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
   const radius = 108;
@@ -118,8 +125,24 @@ export const TimerCard: React.FC<TimerCardProps> = ({
           </button>
         </div>
 
-        {/* Audio and Zen buttons */}
+        {/* Audio, Lock, and Zen buttons */}
         <div className="flex items-center gap-2">
+          <button
+            onClick={onToggleStrictLock}
+            aria-label={strictLockEnabled ? 'Disable Deep Lock Guard' : 'Enable Deep Lock Guard'}
+            className={`p-2 rounded-full border transition-all ${
+              strictLockEnabled
+                ? 'border-[#ff7e6b]/40 bg-[#ff7e6b]/20 text-[#ffb88c] shadow-sm shadow-[#ff7e6b]/20'
+                : 'border-white/10 bg-white/5 hover:bg-white/10 text-[#b7b5d6] hover:text-white'
+            }`}
+            title={
+              strictLockEnabled
+                ? 'Deep Lock Guard: ACTIVE (blocks leaving page & monitors tab switching)'
+                : 'Deep Lock Guard: OFF (click to guard workspace from exits and tab switching)'
+            }
+          >
+            {strictLockEnabled ? <Lock className="w-4 h-4 text-[#ff7e6b]" /> : <Unlock className="w-4 h-4" />}
+          </button>
           <button
             onClick={onToggleSound}
             aria-label={soundEnabled ? 'Mute sound alerts' : 'Enable sound alerts'}
@@ -202,6 +225,13 @@ export const TimerCard: React.FC<TimerCardProps> = ({
               'Ready'
             )}
           </span>
+
+          {isRunning && mode === 'focus' && strictLockEnabled && (
+            <span className="mt-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-[#ff7e6b]/20 text-[#ffb88c] border border-[#ff7e6b]/30 flex items-center gap-1 shadow-sm">
+              <Lock className="w-3 h-3 text-[#ff7e6b]" />
+              Locked · Exit Guard
+            </span>
+          )}
         </div>
       </div>
 
@@ -292,6 +322,34 @@ export const TimerCard: React.FC<TimerCardProps> = ({
           />
           <span>mins</span>
         </div>
+      </div>
+
+      {/* Deep Lock Guard Control Bar */}
+      <div className="mt-3 pt-3 border-t border-white/10 w-full flex items-center justify-between text-xs">
+        <div className="flex items-center gap-1.5 text-[#b7b5d6]">
+          <ShieldCheck className={`w-3.5 h-3.5 ${strictLockEnabled ? 'text-[#ff7e6b]' : 'text-[#8b90d6]'}`} />
+          <span>Exit & Tab-Switch Guard:</span>
+        </div>
+        <button
+          onClick={onToggleStrictLock}
+          className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-all flex items-center gap-1.5 ${
+            strictLockEnabled
+              ? 'bg-[#ff7e6b]/20 text-[#ffb88c] border-[#ff7e6b]/40 shadow-sm shadow-[#ff7e6b]/20'
+              : 'bg-white/5 text-[#b7b5d6] border-white/10 hover:text-white'
+          }`}
+        >
+          {strictLockEnabled ? (
+            <>
+              <Lock className="w-3 h-3 text-[#ff7e6b]" />
+              Active (Guarded)
+            </>
+          ) : (
+            <>
+              <Unlock className="w-3 h-3" />
+              Disabled
+            </>
+          )}
+        </button>
       </div>
 
       {/* Current Active Micro-Step Notice */}

@@ -12,6 +12,8 @@ import {
   evaluateStreakOnLoad,
   recordCompletedSessionInStreak,
   getLast7DaysStatus,
+  formatAwayTime,
+  calculateFocusIntegrity,
 } from './logic.ts';
 
 test('formatTime formats seconds into mm:ss with zero-padding', () => {
@@ -122,4 +124,30 @@ test('getLast7DaysStatus returns array of 7 consecutive day objects', () => {
   assert.equal(days[5].count, 2);
   assert.equal(days[5].goalMet, false);
 });
+
+test('formatAwayTime formats seconds into readable strings', () => {
+  assert.equal(formatAwayTime(5), '5s');
+  assert.equal(formatAwayTime(45), '45s');
+  assert.equal(formatAwayTime(60), '1m');
+  assert.equal(formatAwayTime(85), '1m 25s');
+  assert.equal(formatAwayTime(120), '2m');
+});
+
+test('calculateFocusIntegrity computes flow rating based on tab switches and away duration', () => {
+  // Perfect session: 0 switches, 0 away
+  const perfect = calculateFocusIntegrity(1500, 0, 0);
+  assert.equal(perfect.score, 100);
+  assert.equal(perfect.badge, 'Impenetrable Flow');
+
+  // Slight switch (1 switch for 10s)
+  const slight = calculateFocusIntegrity(1500, 1, 10);
+  assert.ok(slight.score >= 80 && slight.score < 100);
+  assert.equal(slight.badge, 'High Discipline');
+
+  // Heavy switches (4 switches for 200s)
+  const heavy = calculateFocusIntegrity(1500, 4, 200);
+  assert.ok(heavy.score < 60);
+  assert.equal(heavy.badge, 'Fragmented Attention');
+});
+
 

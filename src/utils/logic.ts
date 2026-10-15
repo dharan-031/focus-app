@@ -251,3 +251,55 @@ export function getRandomNudge(excludeIndex = -1): { text: string; index: number
     index: targetIndex,
   };
 }
+
+export function formatAwayTime(seconds: number): string {
+  if (seconds < 60) return `${Math.max(1, seconds)}s`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return s > 0 ? `${m}m ${s}s` : `${m}m`;
+}
+
+export interface FocusIntegrity {
+  score: number;
+  badge: 'Impenetrable Flow' | 'High Discipline' | 'Moderate Focus' | 'Fragmented Attention';
+  description: string;
+}
+
+export function calculateFocusIntegrity(
+  sessionSeconds: number,
+  tabSwitchesCount: number,
+  awaySecondsTotal: number
+): FocusIntegrity {
+  if (tabSwitchesCount === 0 && awaySecondsTotal === 0) {
+    return {
+      score: 100,
+      badge: 'Impenetrable Flow',
+      description: 'Zero tab switches. Full cognitive presence maintained throughout the sprint.',
+    };
+  }
+
+  const switchPenalty = tabSwitchesCount * 15;
+  const timePenalty = (awaySecondsTotal / Math.max(60, sessionSeconds)) * 50;
+  const score = Math.max(10, Math.round(100 - switchPenalty - timePenalty));
+
+  if (score >= 85) {
+    return {
+      score,
+      badge: 'High Discipline',
+      description: 'Minor tab switch quickly recovered. Excellent focus retention.',
+    };
+  }
+  if (score >= 60) {
+    return {
+      score,
+      badge: 'Moderate Focus',
+      description: 'Some attention drift detected. Practice closing distracting background tabs.',
+    };
+  }
+  return {
+    score,
+    badge: 'Fragmented Attention',
+    description: 'Multiple workspace exits during this session. Consider enabling Hardcore Lock.',
+  };
+}
+

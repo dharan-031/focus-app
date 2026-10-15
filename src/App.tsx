@@ -17,6 +17,12 @@ import { AmbientSoundscape } from './components/AmbientSoundscape';
 import { ZenOverlay } from './components/ZenOverlay';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
 import { FocusStreak } from './components/FocusStreak';
+import { FocusLockAlert } from './components/FocusLockAlert';
+import {
+  Lock,
+  ShieldCheck,
+  ShieldAlert,
+} from 'lucide-react';
 import {
   TimerMode,
   Task,
@@ -106,6 +112,14 @@ export default function App() {
     return createDefaultStreakData();
   });
 
+  // Deep Lock Guard state (prevents closing window & monitors tab switching)
+  const [strictLockEnabled, setStrictLockEnabled] = useState<boolean>(() => {
+    const s = localStorage.getItem('focus_strict_lock');
+    return s !== null ? s === 'true' : true;
+  });
+  const [awayAlertOpen, setAwayAlertOpen] = useState<boolean>(false);
+  const [awayDurationSeconds, setAwayDurationSeconds] = useState<number>(0);
+
   // UI States
   const [isZenMode, setIsZenMode] = useState<boolean>(false);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState<boolean>(false);
@@ -126,10 +140,49 @@ export default function App() {
       localStorage.setItem('focus_minutes_today', totalFocusMinutes.toString());
       localStorage.setItem('focus_distractions', JSON.stringify(distractions));
       localStorage.setItem('focus_streak_data', JSON.stringify(streakData));
+      localStorage.setItem('focus_strict_lock', strictLockEnabled.toString());
     } catch {
       // Ignore local storage error
     }
-  }, [tasks, completedSessions, totalFocusMinutes, distractions, streakData]);
+  }, [tasks, completedSessions, totalFocusMinutes, distractions, streakData, strictLockEnabled]);
+
+  // Browser Close / Reload Guard when Focus Sprint is running
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isRunning && mode === 'focus' && strictLockEnabled) {
+        e.preventDefault();
+        e.returnValue = 'A Deep Focus session is currently active. Exiting now will forfeit your session.';
+        return e.returnValue;
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isRunning, mode, strictLockEnabled]);
+
+  // Tab-leave / Attention loss detection
+  useEffect(() => {
+    let leaveTimestamp: number | null = null;
+
+    const handleVisibilityChange = () => {
+      if (!isRunning || mode !== 'focus' || !strictLockEnabled) return;
+
+      if (document.hidden) {
+        leaveTimestamp = Date.now();
+      } else if (leaveTimestamp) {
+        const awaySecs = Math.round((Date.now() - leaveTimestamp) / 1000);
+        leaveTimestamp = null;
+        if (awaySecs >= 2) {
+          soundEngine.playDistractionChime();
+          setAwayDurationSeconds(awaySecs);
+          setAwayAlertOpen(true);
+          handleLogDistraction(`Tab switch / away for ${awaySecs}s during focus`);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [isRunning, mode, strictLockEnabled]);
 
   // Adjust remaining time whenever focus length or mode changes while stopped
   const modeRef = useRef(mode);
@@ -335,6 +388,13 @@ export default function App() {
 
         {/* Quick Utilities */}
         <div className="flex items-center gap-2">
+          {strictLockEnabled && (
+            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#ff7e6b]/15 text-[#ffb88c] border border-[#ff7e6b]/30 text-xs font-semibold shadow-sm">
+              <ShieldCheck className="w-3.5 h-3.5 text-[#ff7e6b]" />
+              <span>Exit Guard Active</span>
+            </div>
+          )}
+
           <button
             onClick={() => setIsShortcutsOpen(true)}
             className="p-2.5 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-[#b7b5d6] hover:text-white transition-colors"
@@ -389,6 +449,8 @@ export default function App() {
             onToggleSound={() => setSoundEnabled((s) => !s)}
             onOpenZen={() => setIsZenMode(true)}
             onAdjustTime={handleAdjustTime}
+            strictLockEnabled={strictLockEnabled}
+            onToggleStrictLock={() => setStrictLockEnabled((s) => !s)}
           />
 
           <AmbientSoundscape />
@@ -450,6 +512,14 @@ export default function App() {
       <KeyboardShortcutsModal
         isOpen={isShortcutsOpen}
         onClose={() => setIsShortcutsOpen(false)}
+      />
+
+      {/* Tab-Leave & Loss of Focus Guard Alert */}
+      <FocusLockAlert
+        isOpen={awayAlertOpen}
+        awaySeconds={awayDurationSeconds}
+        onDismiss={() => setAwayAlertOpen(false)}
+        activeTaskText={activeTask?.text}
       />
     </div>
   );
